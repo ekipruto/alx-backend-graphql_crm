@@ -1,0 +1,22 @@
+# Stop the server (Ctrl+C)
+
+# Generate requirements.txt
+pip freeze > requirements.txt
+
+# View it
+cat requirements.txt
+```
+
+**Expected content:**
+```
+asgiref==3.7.2
+Django==4.2.7
+django-filter==23.5
+graphene==3.3
+graphene-django==3.2.0
+graphql-core==3.2.3
+graphql-relay==3.2.0
+promise==2.3
+six==1.16.0
+sqlparse==0.4.4
+text-unidecode==1.3
