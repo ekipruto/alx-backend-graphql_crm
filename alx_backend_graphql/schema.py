@@ -1,14 +1,16 @@
 """
 GraphQL Schema Definition
-This file defines the GraphQL schema for the CRM application.
+This file defines the GraphQL schema for the application.
 """
 
 import graphene
+from crm.schema import CRMQuery
 
 
-class Query(graphene.ObjectType):
+class Query(CRMQuery, graphene.ObjectType):
     """
     Root Query class
+    Inherits from CRMQuery and graphene.ObjectType
     Defines all available queries in the GraphQL API
     """
     
@@ -18,11 +20,10 @@ class Query(graphene.ObjectType):
     def resolve_hello(self, info):
         """
         Resolver function for the 'hello' query
-        This function is automatically called when 'hello' is queried
         
         Args:
             self: The Query instance
-            info: GraphQL execution info (context, variables, etc.)
+            info: GraphQL execution info
             
         Returns:
             str: A greeting message
