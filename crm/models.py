@@ -7,7 +7,7 @@ class Customer(models.Model):
     """
     Customer model - stores customer information
     """
-    name = models.CharField(max_length=255)
+    name = models.CharField(max_length=100)
     email = models.EmailField(unique=True)  # Unique email
     
     # Phone validator: +1234567890 or 123-456-7890
@@ -38,7 +38,7 @@ class Product(models.Model):
     """
     Product model - stores product information
     """
-    name = models.CharField(max_length=255)
+    name = models.CharField(max_length=100)
     price = models.DecimalField(
         max_digits=10,
         decimal_places=2,

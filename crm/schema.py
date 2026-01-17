@@ -243,7 +243,7 @@ class CreateOrder(graphene.Mutation):
 # Queries
 # ==========================================
 
-class CRMQuery(graphene.ObjectType):
+class Query(graphene.ObjectType):
     """
     CRM-specific queries
     """
