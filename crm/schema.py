@@ -7,7 +7,7 @@ from django.db import transaction
 from .models import Customer, Product, Order
 from .filters import CustomerFilter, ProductFilter, OrderFilter
 from django.db.models import F
-
+from crm.models import Product
 # ==========================================
 # GraphQL Types (represent database models)
 # ==========================================
