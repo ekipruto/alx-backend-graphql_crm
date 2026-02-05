@@ -6,7 +6,7 @@ from django.core.exceptions import ValidationError
 from django.db import transaction
 from .models import Customer, Product, Order
 from .filters import CustomerFilter, ProductFilter, OrderFilter
-
+from django.db.models import F
 
 # ==========================================
 # GraphQL Types (represent database models)
@@ -300,3 +300,79 @@ class Query(graphene.ObjectType):
 
 # Your schema export
 schema = graphene.Schema(query=Query)
+class UpdateLowStockProducts(graphene.Mutation):
+    """
+    Mutation to update low-stock products (stock < 10).
+    Increments stock by 10 to simulate restocking.
+    """
+    
+    class Arguments:
+        # No arguments needed - automatically finds low stock products
+        pass
+    
+    # Return fields
+    success = graphene.Boolean()
+    message = graphene.String()
+    updated_products = graphene.List(ProductType)
+    updated_count = graphene.Int()
+    
+    def mutate(self, info):
+        """
+        Execute the mutation to restock low-stock products.
+        """
+        try:
+            # Find products with stock less than 10
+            low_stock_products = Product.objects.filter(stock__lt=10)
+            
+            # Count products before update
+            count = low_stock_products.count()
+            
+            if count == 0:
+                return UpdateLowStockProducts(
+                    success=True,
+                    message="No low-stock products found. All products have sufficient stock.",
+                    updated_products=[],
+                    updated_count=0
+                )
+            
+            # Get list of products before updating (for return)
+            products_list = list(low_stock_products)
+            
+            # Update stock by incrementing by 10
+            # Using F() expression for atomic update
+            low_stock_products.update(stock=F('stock') + 10)
+            
+            # Refresh products from database to get updated values
+            updated_products = Product.objects.filter(
+                id__in=[p.id for p in products_list]
+            )
+            
+            return UpdateLowStockProducts(
+                success=True,
+                message=f"Successfully restocked {count} low-stock product(s). Stock increased by 10 units each.",
+                updated_products=list(updated_products),
+                updated_count=count
+            )
+        
+        except Exception as e:
+            return UpdateLowStockProducts(
+                success=False,
+                message=f"Error restocking products: {str(e)}",
+                updated_products=[],
+                updated_count=0
+            )
+
+
+class Mutation(graphene.ObjectType):
+    """
+    Main Mutation class containing all mutations.
+    """
+    update_low_stock_products = UpdateLowStockProducts.Field()
+    
+    # Add other mutations here as needed
+    # create_customer = CreateCustomer.Field()
+    # create_order = CreateOrder.Field()
+
+
+# Update schema to include Mutation
+schema = graphene.Schema(query=Query, mutation=Mutation)

@@ -137,3 +137,120 @@ def test_heartbeat():
 
 # Make functions available for django-crontab
 __all__ = ['log_crm_heartbeat', 'test_heartbeat']
+# ... existing imports and functions ...
+
+def update_low_stock():
+    """
+    Execute GraphQL mutation to update low-stock products.
+    Runs every 12 hours to restock products with stock < 10.
+    
+    Logs:
+        - Product names and new stock levels
+        - Timestamp
+        - File: /tmp/low_stock_updates_log.txt
+    """
+    log_file = '/tmp/low_stock_updates_log.txt'
+    timestamp = datetime.now().strftime('%d/%m/%Y-%H:%M:%S')
+    
+    # Define GraphQL mutation
+    mutation = gql("""
+        mutation {
+            updateLowStockProducts {
+                success
+                message
+                updatedCount
+                updatedProducts {
+                    id
+                    name
+                    stock
+                    price
+                }
+            }
+        }
+    """)
+    
+    try:
+        # Execute mutation
+        client = get_graphql_client()
+        result = client.execute(mutation)
+        
+        # Extract result data
+        data = result.get('updateLowStockProducts', {})
+        success = data.get('success', False)
+        message = data.get('message', 'No response')
+        updated_count = data.get('updatedCount', 0)
+        updated_products = data.get('updatedProducts', [])
+        
+        # Prepare log message
+        with open(log_file, 'a') as f:
+            # Log header
+            f.write(f"\n{'='*70}\n")
+            f.write(f"[{timestamp}] Low Stock Update Job Started\n")
+            f.write(f"{'='*70}\n")
+            
+            if success:
+                f.write(f"[{timestamp}] ✓ {message}\n")
+                
+                if updated_count > 0:
+                    f.write(f"[{timestamp}] Updated {updated_count} product(s):\n\n")
+                    
+                    # Log each updated product
+                    for idx, product in enumerate(updated_products, 1):
+                        f.write(f"  {idx}. Product: {product['name']}\n")
+                        f.write(f"     New Stock Level: {product['stock']} units\n")
+                        f.write(f"     Price: ${product['price']}\n")
+                        f.write(f"     Product ID: {product['id']}\n")
+                        f.write(f"     ---\n")
+                else:
+                    f.write(f"[{timestamp}] No products needed restocking.\n")
+            else:
+                f.write(f"[{timestamp}] ✗ Error: {message}\n")
+            
+            # Log footer
+            completion_time = datetime.now().strftime('%d/%m/%Y-%H:%M:%S')
+            f.write(f"\n[{completion_time}] Low stock update job completed.\n")
+            f.write(f"{'='*70}\n")
+        
+        # Print to stdout (appears in cron logs)
+        print(f"[LOW STOCK UPDATE] {timestamp} - {message}")
+        
+        return True
+    
+    except Exception as e:
+        error_message = f"{timestamp} ERROR: {str(e)}"
+        
+        with open(log_file, 'a') as f:
+            f.write(f"\n{'='*70}\n")
+            f.write(f"[{error_message}]\n")
+            f.write(f"{'='*70}\n")
+        
+        print(f"[LOW STOCK UPDATE ERROR] {error_message}", file=sys.stderr)
+        return False
+
+
+def test_low_stock_update():
+    """
+    Test function to manually verify low stock update works.
+    Run with: python manage.py shell
+    >>> from crm.cron import test_low_stock_update
+    >>> test_low_stock_update()
+    """
+    print("Testing low stock update...")
+    result = update_low_stock()
+    
+    if result:
+        print("✓ Low stock update executed successfully")
+        print("\nLog contents:")
+        with open('/tmp/low_stock_updates_log.txt', 'r') as f:
+            lines = f.readlines()
+            # Show last 30 lines
+            for line in lines[-30:]:
+                print(line.rstrip())
+    else:
+        print("✗ Low stock update failed")
+    
+    return result
+
+
+# Update __all__ to include new functions
+__all__ = ['log_crm_heartbeat', 'test_heartbeat', 'update_low_stock', 'test_low_stock_update']
