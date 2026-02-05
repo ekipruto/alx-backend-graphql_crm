@@ -40,6 +40,7 @@ INSTALLED_APPS = [
     # Third-party apps
     'graphene_django',
     'django_filters',
+     'django_crontab',
     
     # Local apps
     'crm',
@@ -125,3 +126,12 @@ STATIC_URL = 'static/'
 GRAPHENE = {
     'SCHEMA': 'alx_backend_graphql.schema.schema',  # Points to our schema
 }
+CRONJOBS = [
+    # Heartbeat logger - runs every 5 minutes
+    # Format: */5 * * * * = every 5 minutes
+    ('*/5 * * * *', 'crm.cron.log_crm_heartbeat'),
+]
+
+# Crontab settings
+CRONTAB_LOCK_JOBS = True  # Prevent overlapping jobs
+CRONTAB_COMMAND_SUFFIX = '2>&1'  # Capture output to cron log

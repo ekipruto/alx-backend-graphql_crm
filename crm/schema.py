@@ -275,3 +275,28 @@ class Mutation(graphene.ObjectType):
     bulk_create_customers = BulkCreateCustomers.Field()
     create_product = CreateProduct.Field()
     create_order = CreateOrder.Field()
+class Query(graphene.ObjectType):
+    """Main Query class with all resolvers"""
+    
+    # Add this hello field for health checks
+    hello = graphene.String(
+        name=graphene.String(default_value="World"),
+        description="Simple health check endpoint"
+    )
+    
+    # Your existing fields...
+    all_customers = DjangoFilterConnectionField(
+        CustomerType,
+        filterset_class=CustomerFilter,
+        # ... rest of your fields
+    )
+    
+    # ... rest of your Query class
+    
+    def resolve_hello(self, info, name):
+        """Resolver for hello field - health check"""
+        return f"Hello {name}! CRM GraphQL API is responsive."
+
+
+# Your schema export
+schema = graphene.Schema(query=Query)
