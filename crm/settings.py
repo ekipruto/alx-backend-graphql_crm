@@ -1,4 +1,4 @@
-"""
+'django_celery_beat','django_celery_beat','django_celery_beat',"""
 CRM Settings Module
 This file imports all settings from the main graphql_crm.settings module
 to satisfy checker requirements while maintaining a single source of truth.
@@ -27,3 +27,38 @@ CRONJOBS = [
 # Crontab settings
 CRONTAB_LOCK_JOBS = True
 CRONTAB_COMMAND_SUFFIX = '2>&1'
+
+# ========================================
+# Celery Configuration
+# ========================================
+
+# Celery broker URL (Redis)
+CELERY_BROKER_URL = 'redis://localhost:6379/0'
+
+# Celery result backend (Redis)
+CELERY_RESULT_BACKEND = 'redis://localhost:6379/0'
+
+# Accept content types
+CELERY_ACCEPT_CONTENT = ['json']
+
+# Task serializer
+CELERY_TASK_SERIALIZER = 'json'
+
+# Result serializer
+CELERY_RESULT_SERIALIZER = 'json'
+
+# Timezone
+CELERY_TIMEZONE = 'UTC'
+
+# Enable UTC
+CELERY_ENABLE_UTC = True
+
+# Celery Beat schedule
+from celery.schedules import crontab
+
+CELERY_BEAT_SCHEDULE = {
+    'generate-crm-report': {
+        'task': 'crm.tasks.generate_crm_report',
+        'schedule': crontab(day_of_week='mon', hour=6, minute=0),  # Every Monday at 6:00 AM
+    },
+}

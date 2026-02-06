@@ -8,6 +8,7 @@ from .models import Customer, Product, Order
 from .filters import CustomerFilter, ProductFilter, OrderFilter
 from django.db.models import F
 from crm.models import Product
+from django.db.models import Sum, Count
 # ==========================================
 # GraphQL Types (represent database models)
 # ==========================================
@@ -376,3 +377,54 @@ class Mutation(graphene.ObjectType):
 
 # Update schema to include Mutation
 schema = graphene.Schema(query=Query, mutation=Mutation)
+
+class Query(graphene.ObjectType):
+    """Main Query class with all resolvers"""
+    
+    # ... your existing fields ...
+    
+    # Aggregation queries for reports
+    total_customers = graphene.Int(description="Total number of customers")
+    total_orders = graphene.Int(description="Total number of orders")
+    total_revenue = graphene.Float(description="Total revenue from all orders")
+    
+    # CRM statistics (combined query)
+    crm_stats = graphene.Field(
+        'CRMStatsType',
+        description="Combined CRM statistics"
+    )
+    
+    # ... rest of your existing queries ...
+    
+    def resolve_total_customers(self, info):
+        """Return total number of customers"""
+        return Customer.objects.count()
+    
+    def resolve_total_orders(self, info):
+        """Return total number of orders"""
+        return Order.objects.count()
+    
+    def resolve_total_revenue(self, info):
+        """Return total revenue from all orders"""
+        result = Order.objects.aggregate(total=Sum('total_amount'))
+        return float(result['total'] or 0)
+    
+    def resolve_crm_stats(self, info):
+        """Return combined CRM statistics"""
+        total_customers = Customer.objects.count()
+        total_orders = Order.objects.count()
+        total_revenue = Order.objects.aggregate(total=Sum('total_amount'))['total'] or 0
+        
+        return {
+            'total_customers': total_customers,
+            'total_orders': total_orders,
+            'total_revenue': float(total_revenue)
+        }
+
+
+# Add a new type for CRM statistics (before Query class)
+class CRMStatsType(graphene.ObjectType):
+    """Type for CRM statistics"""
+    total_customers = graphene.Int()
+    total_orders = graphene.Int()
+    total_revenue = graphene.Float()

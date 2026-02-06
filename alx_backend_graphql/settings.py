@@ -40,8 +40,8 @@ INSTALLED_APPS = [
     # Third-party apps
     'graphene_django',
     'django_filters',
-     'django_crontab',
-    
+    'django_crontab',
+    'django_celery_beat',
     # Local apps
     'crm',
 ]
