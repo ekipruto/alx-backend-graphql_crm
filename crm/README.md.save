@@ -1,0 +1,349 @@
+# CRM Celery Setup Guide
+
+This guide explains how to set up and run Celery tasks for automated CRM report generation.
+
+## Overview
+
+The CRM application uses Celery for asynchronous task processing, including:
+- Weekly CRM reports (customers, orders, revenue)
+- Background job processing
+- Scheduled task execution
+
+## Prerequisites
+
+- Python 3.10+
+- Django 4.2+
+- Redis server
+
+## Installation
+
+### 1. Install Redis
+
+#### On Ubuntu/Debian:
+```bash
+sudo apt-get update
+sudo apt-get install -y redis-server
+sudo service redis-server start
+```
+
+#### Using Docker:
+```bash
+docker run -d --name redis -p 6379:6379 redis:latest
+```
+
+#### Verify Redis is running:
+```bash
+redis-cli ping
+# Should return: PONG
+```
+
+### 2. Install Python Dependencies
+```bash
+pip install -r requirements.txt
+```
+
+The following packages are required:
+- `celery==5.3.4`
+- `redis==5.0.1`
+- `django-celery-beat==2.5.0`
+
+### 3. Run Database Migrations
+```bash
+python manage.py migrate
+```
+
+This creates the necessary tables for `django-celery-beat`.
+
+## Configuration
+
+### Celery Settings
+
+Celery is configured in `crm/settings.py`:
+```python
+# Broker and backend
+CELERY_BROKER_URL = 'redis://localhost:6379/0'
+CELERY_RESULT_BACKEND = 'redis://localhost:6379/0'
+
+# Schedule
+CELERY_BEAT_SCHEDULE = {
+    'generate-crm-report': {
+        'task': 'crm.tasks.generate_crm_report',
+        'schedule': crontab(day_of_week='mon', hour=6, minute=0),
+    },
+}
+```
+
+### Scheduled Tasks
+
+| Task | Schedule | Description |
+|------|----------|-------------|
+| `generate_crm_report` | Every Monday 6:00 AM | Generates weekly CRM statistics report |
+
+## Running Celery
+
+### Start Django Development Server
+
+In terminal 1:
+```bash
+python manage.py runserver
+```
+
+### Start Celery Worker
+
+In terminal 2:
+```bash
+celery -A crm worker -l info
+```
+
+**Expected output:**
+```
+celery@hostname v5.3.4 (emerald-rush)
+...
+[tasks]
+  . crm.tasks.generate_crm_report
+  . crm.tasks.test_celery
+...
+[2025-01-10 16:00:00,000: INFO/MainProcess] Connected to redis://localhost:6379/0
+[2025-01-10 16:00:00,000: INFO/MainProcess] celery@hostname ready.
+```
+
+### Start Celery Beat (Scheduler)
+
+In terminal 3:
+```bash
+celery -A crm beat -l info
+```
+
+**Expected output:**
+```
+celery beat v5.3.4 (emerald-rush) is starting.
+...
+LocalTime -> 2025-01-10 16:00:00
+Configuration ->
+    . broker -> redis://localhost:6379/0
+    . loader -> celery.loaders.app.AppLoader
+    . scheduler -> celery.beat.PersistentScheduler
+    . logfile -> [stderr]@%INFO
+    . maxinterval -> 5.00 minutes (300s)
+```
+
+## Testing
+
+### Test Celery Worker
+```bash
+python manage.py shell
+```
+```python
+from crm.tasks import test_celery
+
+# Execute task synchronously (for testing)
+result = test_celery.delay()
+print(result.get())
+```
+
+### Test Report Generation Manually
+```bash
+python manage.py shell
+```
+```python
+from crm.tasks import generate_crm_report
+
+# Run report generation
+result = generate_crm_report.delay()
+print(result.get())
+```
+
+### Verify Logs
+```bash
+# View the CRM report log
+cat /tmp/crm_report_log.txt
+
+# Monitor in real-time
+tail -f /tmp/crm_report_log.txt
+```
+
+**Expected log format:**
+,```
+================================================================================
+[2025-01-10 16:00:00] Weekly CRM Report
+================================================================================
+Total Customers: 150
+Total Orders: 320
+Total Revenue: $45678.90
+================================================================================
+
+2025-01-10 16:00:00 - Report: 150 customers, 320 orders, $45678.90 revenue.
+```
+
+## Troubleshooting
+
+### Redis Connection Error
+
+**Error:** `Error 111 connecting to localhost:6379. Connection refused.`
+
+**Solution:**
+```bash
+# Check if Redis is running
+sudo service redis-server status
+
+# Start Redis
+sudo service redis-server start
+
+# Or restart
+sudo service redis-server restart
+```
+
+### Task Not Executing
+
+**Check Celery worker is running:**
+```bash
+# Should show worker process
+ps aux | grep celery
+```
+
+**Check Celery Beat is running:**
+```bash
+ps aux | grep "celery beat"
+```
+
+### GraphQL Connection Error
+
+**Ensure Django server is running on port 8000:**
+```bash
+python manage.py runserver
+```
+
+**Test GraphQL endpoint:**
+```bash
+curl http://localhost:8000/graphql
+```
+
+### Import Errors
+
+**Solution:**
+```bash
+# Ensure all dependencies are installed
+pip install -r requirements.txt
+
+# Run migrations
+python manage.py migrate
+```
+
+## Production Deployment
+
+### Using Systemd (Linux)
+
+Create service files for Celery worker and beat:
+
+**`/etc/systemd/system/celery.service`:**
+```ini
+[Unit]
+Description=Celery Worker
+After=network.target redis.service
+
+[Service]
+Type=forking
+User=www-data
+Group=www-data
+WorkingDirectory=/path/to/alx-backend-graphql_crm
+ExecStart=/path/to/venv/bin/celery -A crm worker -l info --detach
+ExecStop=/path/to/venv/bin/celery -A crm control shutdown
+
+[Install]
+WantedBy=multi-user.target
+```
+
+**`/etc/systemd/system/celerybeat.service`:**
+```ini
+[Unit]
+Description=Celery Beat
+After=network.target redis.service
+
+[Service]
+Type=simple
+User=www-data
+Group=www-data
+WorkingDirectory=/path/to/alx-backend-graphql_crm
+ExecStart=/path/to/venv/bin/celery -A crm beat -l info
+
+[Install]
+WantedBy=multi-user.target
+```
+
+**Enable and start:**
+```bash
+sudo systemctl enable celery celerybeat
+sudo systemctl start celery celerybeat
+```
+
+### Using Supervisor
+
+Install supervisor:
+```bash
+sudo apt-get install supervisor
+```
+
+Create config `/etc/supervisor/conf.d/celery.conf`:
+```ini
+[program:celery]
+command=/path/to/venv/bin/celery -A crm worker -l info
+directory=/path/to/alx-backend-graphql_crm
+user=www-data
+autostart=true
+autorestart=true
+redirect_stderr=true
+stdout_logfile=/var/log/celery/worker.log
+
+[program:celerybeat]
+command=/path/to/venv/bin/celery -A crm beat -l info
+directory=/path/to/alx-backend-graphql_crm
+user=www-data
+autostart=true
+autorestart=true
+redirect_stderr=true
+stdout_logfile=/var/log/celery/beat.log
+```
+
+## Monitoring
+
+### View Active Tasks
+```bash
+celery -A crm inspect active
+```
+
+### View Registered Tasks
+```bash
+celery -A crm inspect registered
+```
+
+### View Scheduled Tasks
+```bash
+celery -A crm inspect scheduled
+```
+
+### Celery Flower (Web Monitor)
+
+Install Flower:
+```bash
+pip install flower
+```
+
+Run Flower:
+```bash
+celery -A crm flower
+```
+
+Access at: http://localhost:5555
+
+## Additional Resources
+
+- [Celery Documentation](https://docs.celeryproject.org/)
+- [Django-Celery-Beat Documentation](https://django-celery-beat.readthedocs.io/)
+- [Redis Documentation](https://redis.io/documentation)
+
+## Support
+
+For issues or questions, check:
+- Project repository issues
+- Celery documentation
+- Django documentation

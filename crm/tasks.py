@@ -7,7 +7,7 @@ from __future__ import absolute_import, unicode_literals
 from celery import shared_task
 from datetime import datetime
 import sys
-
+import requests
 # GraphQL client imports
 from gql import gql, Client
 from gql.transport.requests import RequestsHTTPTransport
